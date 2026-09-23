@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  CheckCircle2,
   ClipboardList,
   CreditCard,
   FileBarChart,
@@ -19,6 +20,7 @@ import {
   Package,
   Plus,
   Receipt,
+  Save,
   Search,
   Settings,
   Sprout,
@@ -36,6 +38,25 @@ type NavItem = {
   label: string;
   icon: typeof LayoutDashboard;
   badge?: string;
+};
+
+type InvoiceRecord = {
+  id: string;
+  client: string;
+  description: string;
+  date: string;
+  dueDate: string;
+  amount: number;
+  paid: number;
+  status: "Paid" | "Partially paid" | "Unpaid" | "Overdue";
+};
+
+type PaymentRecord = {
+  id: string;
+  invoiceId: string;
+  amount: number;
+  date: string;
+  method: string;
 };
 
 const navItems: NavItem[] = [
@@ -64,6 +85,12 @@ const activity = [
   { title: "Invoice INV-2048 paid", detail: "Mhlabeni Growers · ZAR 18,450", time: "18 min ago", tone: "green" },
   { title: "New quote accepted", detail: "Kalahari Produce Co. · QT-1032", time: "2 hours ago", tone: "blue" },
   { title: "Fuel expense imported", detail: "N4 Logistics · ZAR 2,840", time: "Yesterday", tone: "amber" },
+];
+
+const startingInvoices: InvoiceRecord[] = [
+  { id: "INV-2048", client: "Mhlabeni Growers", description: "Dragon fruit cultivar supply", date: "23 Sep 2026", dueDate: "23 Oct 2026", amount: 18450, paid: 18450, status: "Paid" },
+  { id: "INV-2044", client: "Limpopo Fresh Markets", description: "Wholesale plant stock", date: "21 Sep 2026", dueDate: "21 Oct 2026", amount: 9640, paid: 0, status: "Overdue" },
+  { id: "INV-2042", client: "Karoo Citrus Estate", description: "Cross-border logistics and inputs", date: "19 Sep 2026", dueDate: "19 Oct 2026", amount: 27200, paid: 0, status: "Unpaid" },
 ];
 
 const salesRows = [
@@ -138,7 +165,39 @@ function SalesLine() {
   );
 }
 
-function Overview({ onNew }: { onNew: () => void }) {
+function InvoiceModal({ onClose, onCreate }: { onClose: () => void; onCreate: (invoice: InvoiceRecord) => void }) {
+  const [client, setClient] = useState("");
+  const [description, setDescription] = useState("Agricultural products and services");
+  const [amount, setAmount] = useState("");
+  const [dueDate, setDueDate] = useState("2026-10-23");
+  const [error, setError] = useState("");
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const numericAmount = Number(amount);
+    if (!client.trim() || !numericAmount || numericAmount <= 0) { setError("Add a client and a valid invoice amount to continue."); return; }
+    onCreate({ id: `INV-${2050 + Math.floor(Math.random() * 40)}`, client: client.trim(), description: description.trim() || "Agricultural products and services", date: "23 Sep 2026", dueDate: dueDate ? new Date(`${dueDate}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "23 Oct 2026", amount: numericAmount, paid: 0, status: "Unpaid" });
+  };
+  return <div className="modal-backdrop" onClick={onClose}><form className="workflow-modal" onClick={(event) => event.stopPropagation()} onSubmit={submit}><div className="modal-title"><div><span className="eyebrow muted">SALES WORKFLOW</span><h2>Create invoice</h2><p>Issue a professional invoice and track payment against it.</p></div><button type="button" className="icon-ghost" onClick={onClose}><X size={17} /></button></div><div className="form-grid"><label>Client<input autoFocus value={client} onChange={(event) => setClient(event.target.value)} placeholder="e.g. Mhlabeni Growers" /></label><label>Invoice amount<input type="number" min="1" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" /></label><label className="wide">Description<input value={description} onChange={(event) => setDescription(event.target.value)} /></label><label>Due date<input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label><label>Tax treatment<select defaultValue="exclusive"><option value="exclusive">VAT exclusive</option><option value="inclusive">VAT inclusive</option><option value="zero">Zero-rated</option></select></label></div>{error && <p className="form-error">{error}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button"><Save size={16} /> Create invoice</button></div></form></div>;
+}
+
+function PaymentModal({ invoice, onClose, onRecord }: { invoice: InvoiceRecord; onClose: () => void; onRecord: (payment: PaymentRecord) => void }) {
+  const balance = invoice.amount - invoice.paid;
+  const [amount, setAmount] = useState(String(balance));
+  const [method, setMethod] = useState("EFT / bank transfer");
+  const [error, setError] = useState("");
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const numericAmount = Number(amount);
+    if (!numericAmount || numericAmount <= 0 || numericAmount > balance) { setError(`Enter an amount between ZAR 0.01 and ZAR ${balance.toLocaleString()}.`); return; }
+    onRecord({ id: `PAY-${Date.now()}`, invoiceId: invoice.id, amount: numericAmount, date: "23 Sep 2026", method });
+  };
+  return <div className="modal-backdrop" onClick={onClose}><form className="workflow-modal payment-modal" onClick={(event) => event.stopPropagation()} onSubmit={submit}><div className="modal-title"><div><span className="eyebrow muted">RECEIVABLES</span><h2>Record payment</h2><p>{invoice.id} · {invoice.client}</p></div><button type="button" className="icon-ghost" onClick={onClose}><X size={17} /></button></div><div className="payment-balance"><span>Remaining balance</span><strong>ZAR {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></div><div className="form-grid"><label>Payment amount<input autoFocus type="number" min="0.01" max={balance} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></label><label>Payment method<select value={method} onChange={(event) => setMethod(event.target.value)}><option>EFT / bank transfer</option><option>Cash</option><option>Credit card</option><option>Direct deposit</option></select></label></div>{error && <p className="form-error">{error}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button"><CheckCircle2 size={16} /> Record payment</button></div></form></div>;
+}
+
+function Overview({ onNew, invoices, onRecordPayment }: { onNew: () => void; invoices: InvoiceRecord[]; onRecordPayment: (invoice: InvoiceRecord) => void }) {
+  const unpaid = invoices.filter((invoice) => invoice.amount > invoice.paid);
+  const outstanding = unpaid.reduce((sum, invoice) => sum + invoice.amount - invoice.paid, 0);
+  const paidLast30 = invoices.reduce((sum, invoice) => sum + invoice.paid, 0);
   return (
     <>
       <section className="welcome-row">
@@ -151,7 +210,7 @@ function Overview({ onNew }: { onNew: () => void }) {
         <StatCard title="Profit and loss" amount="ZAR 8K" caption="Net income for September" accent="profit-accent"><ProfitBars /></StatCard>
       </section>
       <section className="lower-grid">
-        <article className="panel invoices-panel"><div className="panel-title"><div><span className="eyebrow muted">RECEIVABLES</span><h2>Invoices</h2></div><button className="link-button">View all <ArrowUpRight size={14} /></button></div><div className="invoice-summary"><div><span>Unpaid · Last 365 days</span><strong>ZAR 5,281.52</strong><div className="progress"><i style={{ width: "32%" }} /></div><small><b>ZAR 1,525.50</b> overdue</small></div><div><span>Paid · Last 30 days</span><strong>ZAR 3,692.22</strong><div className="progress"><i className="green-progress" style={{ width: "78%" }} /></div><small><b>ZAR 2,062.52</b> deposited</small></div></div></article>
+        <article className="panel invoices-panel"><div className="panel-title"><div><span className="eyebrow muted">RECEIVABLES</span><h2>Invoices</h2></div><button className="link-button" onClick={onNew}>New invoice <Plus size={14} /></button></div><div className="invoice-summary"><div><span>Unpaid · Current balance</span><strong>ZAR {outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong><div className="progress"><i style={{ width: `${Math.min(100, Math.max(12, outstanding / 900))}%` }} /></div><small><b>{unpaid.length}</b> open invoice{unpaid.length === 1 ? "" : "s"}</small></div><div><span>Paid · Recorded this month</span><strong>ZAR {paidLast30.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong><div className="progress"><i className="green-progress" style={{ width: `${Math.min(100, Math.max(18, paidLast30 / 300))}%` }} /></div><small><b>{invoices.filter((invoice) => invoice.status === "Paid").length}</b> settled</small></div></div><div className="dashboard-invoice-list">{unpaid.slice(0, 2).map((invoice) => <div className="dashboard-invoice" key={invoice.id}><div><b>{invoice.id}</b><span>{invoice.client}</span></div><div className="dashboard-invoice-right"><strong>ZAR {(invoice.amount - invoice.paid).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong><button onClick={() => onRecordPayment(invoice)}>Record payment</button></div></div>)}</div></article>
         <article className="panel sales-panel"><div className="panel-title"><div><span className="eyebrow muted">PERFORMANCE</span><h2>Sales</h2></div><select defaultValue="week" aria-label="Sales period"><option value="week">This week</option><option value="month">This month</option></select></div><div className="sales-total"><strong>ZAR 3.5K</strong><span>Total profit</span></div><SalesLine /></article>
         <article className="panel bank-panel"><div className="panel-title"><div><span className="eyebrow muted">CONNECTED ACCOUNTS</span><h2>Bank accounts</h2></div><button className="icon-ghost"><Settings size={16} /></button></div><div className="account-row"><div><span className="account-name">CHECKING</span><p>Bank balance in QuickBooks</p></div><div className="account-amount"><b>ZAR 12,435.65</b><span>Updated 4 days ago</span></div></div><div className="account-row"><div><span className="account-name">CREDIT CARD</span><p>Bank balance in QuickBooks</p></div><div className="account-amount"><b>-ZAR 3,435.65</b><span>Updated yesterday</span></div></div></article>
       </section>
@@ -171,9 +230,23 @@ export default function Home() {
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isNewOpen, setNewOpen] = useState(false);
   const [isSearchOpen, setSearchOpen] = useState(false);
+  const [isInvoiceOpen, setInvoiceOpen] = useState(false);
+  const [paymentInvoice, setPaymentInvoice] = useState<InvoiceRecord | null>(null);
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>(startingInvoices);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [period, setPeriod] = useState("This month");
   const currentLabel = useMemo(() => navItems.find((item) => item.id === activeView)?.label || "Business overview", [activeView]);
   const navigate = (view: View) => { setActiveView(view); setMenuOpen(false); window.history.pushState({}, "", view === "overview" ? "/" : `/${view}`); };
+  const createInvoice = (invoice: InvoiceRecord) => { setInvoices((current) => [invoice, ...current]); setInvoiceOpen(false); setActiveView("sales"); window.history.pushState({}, "", "/sales"); };
+  const recordPayment = (payment: PaymentRecord) => {
+    setPayments((current) => [payment, ...current]);
+    setInvoices((current) => current.map((invoice) => {
+      if (invoice.id !== payment.invoiceId) return invoice;
+      const paid = invoice.paid + payment.amount;
+      return { ...invoice, paid, status: paid >= invoice.amount ? "Paid" : "Partially paid" };
+    }));
+    setPaymentInvoice(null);
+  };
   useEffect(() => {
     const handlePopState = () => setActiveView(viewFromPath(window.location.pathname));
     window.addEventListener("popstate", handlePopState);
@@ -184,10 +257,12 @@ export default function Home() {
     <aside className={`sidebar ${isMenuOpen ? "open" : ""}`}><div className="sidebar-top"><button className="brand-button" onClick={() => navigate("overview")}><span className="brand-icon"><Sprout size={19} /></span><span><strong>ProAgriSA</strong><small>GRADE MASTER</small></span></button><button className="close-menu" onClick={() => setMenuOpen(false)}><X size={18} /></button><button className="new-button" onClick={() => setNewOpen(true)}><Plus size={17} /> New</button></div><div className="side-section-label">Business overview</div><nav className="sidebar-nav">{navItems.map(({ id, label, icon: Icon, badge }) => <button key={id} className={`nav-item ${activeView === id ? "active" : ""}`} onClick={() => navigate(id)}><Icon size={17} /><span>{label}</span>{badge && <em>{badge}</em>}{id === "cash-flow" && <span className="nav-dot" />}</button>)}</nav><div className="sidebar-footer"><button className="nav-item"><CircleHelp size={17} /><span>Help centre</span><ChevronRight className="push-right" size={15} /></button><div className="profile"><div className="profile-avatar">GM</div><div><b>Grade Master</b><span>Owner account</span></div><button aria-label="Account settings"><Settings size={15} /></button></div></div></aside>
     {isMenuOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
     <header className="topbar"><div className="topbar-left"><button className="menu-button" onClick={() => setMenuOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><div className="breadcrumbs"><span>Company</span><ChevronRight size={14} /><strong>{currentLabel}</strong></div></div><div className="topbar-actions"><button className="top-search" onClick={() => setSearchOpen(true)}><Search size={16} /><span>Search</span><kbd>⌘ K</kbd></button><button className="top-icon" aria-label="Notifications"><Bell size={18} /><i /></button><button className="avatar">GM</button></div></header>
-    <main className="content"><div className="content-inner">{activeView === "overview" ? <Overview onNew={() => setNewOpen(true)} /> : <ListView view={activeView} onNew={() => setNewOpen(true)} />}</div></main>
+    <main className="content"><div className="content-inner">{activeView === "overview" ? <Overview onNew={() => setInvoiceOpen(true)} invoices={invoices} onRecordPayment={setPaymentInvoice} /> : <ListView view={activeView} onNew={() => setInvoiceOpen(true)} />}</div></main>
     <footer className="footer"><span>ProAgriSA Grade Master Accounting</span><span>Secure workspace · Last synced just now</span></footer>
     {isNewOpen && <div className="modal-backdrop" onClick={() => setNewOpen(false)}><div className="new-modal" onClick={(event) => event.stopPropagation()}><div className="modal-title"><div><span className="eyebrow muted">QUICK ACTION</span><h2>Create something new</h2></div><button className="icon-ghost" onClick={() => setNewOpen(false)}><X size={17} /></button></div><div className="new-options"><button onClick={() => { setNewOpen(false); navigate("sales"); }}><Receipt size={20} /><span><b>Invoice</b><small>Bill a client for products or services</small></span><ChevronRight size={16} /></button><button onClick={() => { setNewOpen(false); navigate("transactions"); }}><CreditCard size={20} /><span><b>Expense</b><small>Record a business cost or payment</small></span><ChevronRight size={16} /></button><button onClick={() => { setNewOpen(false); navigate("projects"); }}><Truck size={20} /><span><b>Delivery project</b><small>Track a route, farm, or order</small></span><ChevronRight size={16} /></button></div></div></div>}
     {isSearchOpen && <div className="modal-backdrop" onClick={() => setSearchOpen(false)}><div className="search-modal" onClick={(event) => event.stopPropagation()}><div className="search-modal-input"><Search size={18} /><input autoFocus placeholder="Search clients, invoices, reports..." /><kbd>ESC</kbd></div><p>Try “unpaid invoices” or “Mhlabeni Growers”</p></div></div>}
+    {isInvoiceOpen && <InvoiceModal onClose={() => setInvoiceOpen(false)} onCreate={createInvoice} />}
+    {paymentInvoice && <PaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} onRecord={recordPayment} />}
     {period && <button className="period-control" onClick={() => setPeriod(period === "This month" ? "Last month" : "This month")} aria-label="Change reporting period"><CalendarDays size={14} /> {period} <ChevronDown size={13} /></button>}
   </div>;
 }
