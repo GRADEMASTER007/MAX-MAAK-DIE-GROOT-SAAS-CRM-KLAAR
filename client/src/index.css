@@ -123,3 +123,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .payment-balance { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 19px; padding: 13px 14px; border: 1px solid #dcebd9; border-radius: 7px; background: #f4fbf2; }
 .payment-balance span { color: #6c7d71; font-size: 11px; }.payment-balance strong { color: #2f8529; font-size: 18px; letter-spacing: -.04em; }
 @media (max-width: 560px) { .workflow-modal { padding: 18px; }.form-grid { grid-template-columns: 1fr; }.form-grid label.wide { grid-column: auto; }.dashboard-invoice-right strong { font-size: 10px; } }
+
+.invoice-actions { display: flex; align-items: center; gap: 9px; }
+.download-link { display: inline-flex; align-items: center; gap: 3px; padding: 0 !important; color: #5c7d87 !important; background: transparent; font-size: 10px; font-weight: 800; }
+.download-link:hover { color: #2b7180 !important; text-decoration: underline; }

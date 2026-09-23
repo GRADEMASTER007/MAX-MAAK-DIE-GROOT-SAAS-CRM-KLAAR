@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ClipboardList,
   CreditCard,
+  Download,
   FileBarChart,
   FileText,
   LayoutDashboard,
@@ -30,6 +31,7 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+import { jsPDF } from "jspdf";
 
 type View = "overview" | "transactions" | "expenses" | "sales" | "cash-flow" | "projects" | "reports";
 
@@ -92,6 +94,29 @@ const startingInvoices: InvoiceRecord[] = [
   { id: "INV-2044", client: "Limpopo Fresh Markets", description: "Wholesale plant stock", date: "21 Sep 2026", dueDate: "21 Oct 2026", amount: 9640, paid: 0, status: "Overdue" },
   { id: "INV-2042", client: "Karoo Citrus Estate", description: "Cross-border logistics and inputs", date: "19 Sep 2026", dueDate: "19 Oct 2026", amount: 27200, paid: 0, status: "Unpaid" },
 ];
+
+function downloadInvoicePdf(invoice: InvoiceRecord) {
+  const pdf = new jsPDF({ unit: "mm", format: "a4" });
+  const green = [47, 165, 34] as [number, number, number];
+  const ink = [42, 58, 63] as [number, number, number];
+  const muted = [116, 132, 136] as [number, number, number];
+  const line = [221, 230, 230] as [number, number, number];
+  const balance = invoice.amount - invoice.paid;
+  pdf.setFillColor(...green); pdf.rect(0, 0, 210, 10, "F");
+  pdf.setTextColor(...ink); pdf.setFont("helvetica", "bold"); pdf.setFontSize(22); pdf.text("ProAgriSA", 18, 29);
+  pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.setTextColor(...muted); pdf.text("GRADE MASTER ACCOUNTING", 18, 35);
+  pdf.setTextColor(...ink); pdf.setFont("helvetica", "bold"); pdf.setFontSize(24); pdf.text("INVOICE", 192, 29, { align: "right" });
+  pdf.setFontSize(10); pdf.setTextColor(...muted); pdf.text(invoice.id, 192, 36, { align: "right" }); pdf.text(`Issued ${invoice.date}`, 192, 42, { align: "right" }); pdf.text(`Due ${invoice.dueDate}`, 192, 48, { align: "right" });
+  pdf.setDrawColor(...line); pdf.line(18, 59, 192, 59);
+  pdf.setFont("helvetica", "bold"); pdf.setFontSize(9); pdf.setTextColor(...muted); pdf.text("BILL TO", 18, 72);
+  pdf.setTextColor(...ink); pdf.setFontSize(13); pdf.text(invoice.client, 18, 80); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.setTextColor(...muted); pdf.text("Agricultural trade account", 18, 87);
+  pdf.setFillColor(247, 250, 249); pdf.roundedRect(18, 104, 174, 17, 2, 2, "F"); pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9); pdf.text("DESCRIPTION", 24, 114); pdf.text("AMOUNT", 184, 114, { align: "right" });
+  pdf.setTextColor(...ink); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11); pdf.text(invoice.description, 24, 137); pdf.text(`ZAR ${invoice.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 184, 137, { align: "right" });
+  pdf.setDrawColor(...line); pdf.line(18, 146, 192, 146); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("TOTAL", 125, 160); pdf.setFontSize(17); pdf.setTextColor(...green); pdf.text(`ZAR ${invoice.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 192, 160, { align: "right" });
+  pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text(`Paid: ZAR ${invoice.paid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 192, 171, { align: "right" }); pdf.text(`Balance due: ZAR ${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 192, 178, { align: "right" });
+  pdf.setDrawColor(...line); pdf.line(18, 246, 192, 246); pdf.setFontSize(9); pdf.text("Thank you for supporting ProAgriSA agricultural trade.", 18, 257); pdf.text("Generated from Grade Master Accounting", 18, 264);
+  pdf.save(`${invoice.id}-${invoice.client.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`);
+}
 
 const salesRows = [
   { client: "Mhlabeni Growers", document: "INV-2048", date: "23 Sep 2026", status: "Paid", amount: "ZAR 18,450" },
@@ -210,7 +235,7 @@ function Overview({ onNew, invoices, onRecordPayment }: { onNew: () => void; inv
         <StatCard title="Profit and loss" amount="ZAR 8K" caption="Net income for September" accent="profit-accent"><ProfitBars /></StatCard>
       </section>
       <section className="lower-grid">
-        <article className="panel invoices-panel"><div className="panel-title"><div><span className="eyebrow muted">RECEIVABLES</span><h2>Invoices</h2></div><button className="link-button" onClick={onNew}>New invoice <Plus size={14} /></button></div><div className="invoice-summary"><div><span>Unpaid · Current balance</span><strong>ZAR {outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong><div className="progress"><i style={{ width: `${Math.min(100, Math.max(12, outstanding / 900))}%` }} /></div><small><b>{unpaid.length}</b> open invoice{unpaid.length === 1 ? "" : "s"}</small></div><div><span>Paid · Recorded this month</span><strong>ZAR {paidLast30.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong><div className="progress"><i className="green-progress" style={{ width: `${Math.min(100, Math.max(18, paidLast30 / 300))}%` }} /></div><small><b>{invoices.filter((invoice) => invoice.status === "Paid").length}</b> settled</small></div></div><div className="dashboard-invoice-list">{unpaid.slice(0, 2).map((invoice) => <div className="dashboard-invoice" key={invoice.id}><div><b>{invoice.id}</b><span>{invoice.client}</span></div><div className="dashboard-invoice-right"><strong>ZAR {(invoice.amount - invoice.paid).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong><button onClick={() => onRecordPayment(invoice)}>Record payment</button></div></div>)}</div></article>
+        <article className="panel invoices-panel"><div className="panel-title"><div><span className="eyebrow muted">RECEIVABLES</span><h2>Invoices</h2></div><button className="link-button" onClick={onNew}>New invoice <Plus size={14} /></button></div><div className="invoice-summary"><div><span>Unpaid · Current balance</span><strong>ZAR {outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong><div className="progress"><i style={{ width: `${Math.min(100, Math.max(12, outstanding / 900))}%` }} /></div><small><b>{unpaid.length}</b> open invoice{unpaid.length === 1 ? "" : "s"}</small></div><div><span>Paid · Recorded this month</span><strong>ZAR {paidLast30.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong><div className="progress"><i className="green-progress" style={{ width: `${Math.min(100, Math.max(18, paidLast30 / 300))}%` }} /></div><small><b>{invoices.filter((invoice) => invoice.status === "Paid").length}</b> settled</small></div></div><div className="dashboard-invoice-list">{invoices.slice(0, 3).map((invoice) => <div className="dashboard-invoice" key={invoice.id}><div><b>{invoice.id}</b><span>{invoice.client}</span></div><div className="dashboard-invoice-right"><strong>{invoice.amount > invoice.paid ? `ZAR ${(invoice.amount - invoice.paid).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "Paid"}</strong><div className="invoice-actions">{invoice.amount > invoice.paid && <button onClick={() => onRecordPayment(invoice)}>Record payment</button>}<button className="download-link" onClick={() => downloadInvoicePdf(invoice)} title={`Download ${invoice.id} PDF`}><Download size={12} /> PDF</button></div></div></div>)}</div></article>
         <article className="panel sales-panel"><div className="panel-title"><div><span className="eyebrow muted">PERFORMANCE</span><h2>Sales</h2></div><select defaultValue="week" aria-label="Sales period"><option value="week">This week</option><option value="month">This month</option></select></div><div className="sales-total"><strong>ZAR 3.5K</strong><span>Total profit</span></div><SalesLine /></article>
         <article className="panel bank-panel"><div className="panel-title"><div><span className="eyebrow muted">CONNECTED ACCOUNTS</span><h2>Bank accounts</h2></div><button className="icon-ghost"><Settings size={16} /></button></div><div className="account-row"><div><span className="account-name">CHECKING</span><p>Bank balance in QuickBooks</p></div><div className="account-amount"><b>ZAR 12,435.65</b><span>Updated 4 days ago</span></div></div><div className="account-row"><div><span className="account-name">CREDIT CARD</span><p>Bank balance in QuickBooks</p></div><div className="account-amount"><b>-ZAR 3,435.65</b><span>Updated yesterday</span></div></div></article>
       </section>
